@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Page Tester</title>
+  <link rel="stylesheet" href="css/pagetester.css">
+  <script src="js/jquery-3.1.0.min.js"></script>
+  <script>
+    function denyIframe(){
+      var url = $('#originalWeb').attr('src-url');  
+      var reset = $('#originalWeb').attr('is-reset');
+      if(url!=''){
+        if (reset==1) {
+          oldurl = url; 
+          $('.iframeError').hide();
+          $('#originalWeb').show();
+          $('#originalWeb').attr({'src':url,'is-reset':0});
+          setTimeout(function(){
+            $('#originalWeb').attr('is-reset','done');
+          },1000*10);
+        }else if(reset==0){
+          $('.iframeError').show();
+          $('#originalWeb').hide();
+        }else{
+          $('.iframeError').hide();
+          $('#originalWeb').show();
+        }
+      }
+    };
+  </script> 
+</head>
+<body>
+
+
+  <main>
+    <div class="originalWeb">
+      <div class="iframeError" style="display:none;">
+          <h2>该网站不支持IFRAME显示</h2>
+          <button id="openWeb">打开此网站</button>
+      </div>
+      <iframe id="originalWeb" src="about:blank" is-reset="1" src-url="" onload="denyIframe();">
+      </iframe>
+    </div>
+    <div class="phone">
+      <div class="content">
+        <iframe id="phoneBox" src="news-page.html">
+        </iframe>
+      </div>
+    </div>
+    <div class="editBox" id="editBox">
+      <form class="nav">
+        <input id="file" type="file" value="" accept=".txt,.doc" style="display:none;"/>
+        <input type="button" id="filebtn" value="Load List" onclick='javascript:$("#file").click();flag=false;'>
+        <input type="button" id="prev" value="prev" class="gobtn" disabled/>
+        <input type="button" id="next" value="next" class="gobtn" disabled/>
+      </form>
+      <form class="nav">
+        <input type="text" value="http://www.rmolsumsel.com/read/2016/08/15/55876/Lagi-lagi,-Keterangan-Saksi-Ahli-Pojokkan-Posisi-Terdakwa-" id="transcodeSrc"/>
+        <input type="button" value="OK" id="done"/>
+      </form>
+      <textarea name="sanitized_html" id="sanitizedHtml" rows="25"></textarea>
+      <p><button id="look">Have A Look</button><button id="submit">Submit</button></p>
+    </div>
+  </main>
+
+
+  <div class="cover"></div>
+  <div class="loader">
+        <div class="loader-inner ball-spin-fade-loader">
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+  </div>
+
+
+  <script src="js/base64.js"></script>
+  <script>
+    var Urls,flag=false;
+    var jsondata = '';
+    var phoneBox = document.getElementById('phoneBox').contentWindow;
+    var sanitizedHtml= $('#sanitizedHtml');
+    var submit = $('#submit');
+    var upfile = document.querySelector('#file');
+
+
+    function randomStr(a) {
+        var d,
+            e,
+            b = "abcdefghijklmnopqrstuvwxyz0123456789",
+            c = "";
+        for (d = 0; a > d; d += 1)
+            e = Math.random() * b.length, e = Math.floor(e), c += b.charAt(e);
+        return c
+    }
+    function goBtn(index){
+      $('.gobtn').prop('disabled',false);
+      if(index==0){$('#prev').prop('disabled',true);}
+      else if(index==Urls.length-1){$('next').prop('disabled',true);}
+    }
+    function HaveALook(){
+      // flag = true;
+      phoneBox.postMessage(jsondata,"*"); 
+    }
+    function Ajax(Url){
+      time = 0;
+      $('#originalWeb').attr({'is-reset':1,'src':'about:blank','src-url':Url});
+      submit.prop('disabled',false);
+      $('.cover').show();
+      $('.loader').show();
+      $.ajax({
+        type: 'GET',
+        url: 'http://parser.oupeng.com/api/v1/parser?url='+Url+'&token=df89a4112ed197e920f35332036aff43d3813546a&sync=1&cache=0&source=8',
+        success: function(data){
+          jsondata = data;
+          if(window.localStorage){
+            window.localStorage.jsondata = JSON.stringify(data);
+          }
+          sanitizedHtml.val('<h1>'+data.title+'</h1>\n'+data.sanitized_html);
+          HaveALook();
+          $('.cover').hide();
+          $('.loader').hide();
+        },
+        error: function(e){
+          $('.cover').hide();
+          $('.loader').hide();
+          submit.prop('disabled',true);
+          window.localStorage.removeItem("jsondata");
+          jsondata.domain = jsondata.publication_time = jsondata.sanitized_html = '';
+          jsondata.title = '转码错误！<br/>错误代码：'+e.status;
+          sanitizedHtml.val('');
+          HaveALook();
+        }
+      });
+    } 
+    function urlChange(obj){
+      flag = false;
+      var type = obj.data.type;
+      var index = parseInt(window.localStorage.index);
+      if(type=='prev'){
+        index -= 1;
+      }else if(type=='next'){
+        index += 1;
+      }
+      goBtn(index);
+      $('#transcodeSrc').val(Urls[index]);
+      Ajax(Urls[index]);
+      window.localStorage.index = index;
+    }
+    function onbeforeunload_handler() {
+      if(!flag){
+        event.returnValue = '页面刷新？' 
+        flag = true;
+        return event.returnValue;
+      }
+    };
+    
+    
+    Ajax('http://www.rmolsumsel.com/read/2016/08/15/55876/Lagi-lagi,-Keterangan-Saksi-Ahli-Pojokkan-Posisi-Terdakwa-');
+    window.onbeforeunload = onbeforeunload_handler;
+
+
+    $('#look').on('click',function(){
+      var str = sanitizedHtml.val();
+      var arr = str.split('<h1>')[1].split('</h1>');
+      jsondata.title = arr[0];
+      jsondata.sanitized_html = arr[1];
+      HaveALook();
+      $('.cover').hide();
+      $('.loader').hide();
+    });
+    upfile.onchange = function(evt){
+      var e = evt || window.event;
+      if(upfile.files.length>0){
+          var fileReader = new FileReader();
+          fileReader.onload = function(evt){  
+            if(FileReader.DONE==fileReader.readyState)
+            {
+              var urlstr = utf8to16(base64decode(this.result.split(',')[1]))
+              Urls = urlstr.split('\n');
+              $('#transcodeSrc').val(Urls[0]);
+              Ajax(Urls[0]);
+              window.localStorage.urls = Urls;
+              window.localStorage.index = 0;
+              $('#next').prop('disabled',false);
+            }
+          }
+          fileReader.readAsDataURL(upfile.files[0]);
+       }
+    }  
+    $('#prev').on('click',{type:"prev"},urlChange);
+    $('#next').on('click',{type:"next"},urlChange);         
+    $('#done').on('click',function(){
+      flag = false;
+      Ajax($('#transcodeSrc').val());
+    });
+    $('#submit').on('click',function(){
+      $('.cover').show();
+      $('.loader').show();
+      var uuid = randomStr(32);
+      jsondata.uuid = uuid;
+      $.ajax({
+        type: 'POST',
+        data: JSON.stringify(jsondata),
+        url: 'http://www.baidu.com',
+        success: function(data){
+          $('.cover').hide();
+          $('.loader').hide();
+          alert('保存成功');
+        },
+        error: function(e){
+          $('.cover').hide();
+          $('.loader').hide();
+          alert('保存失败');
+        }
+      });
+    });
+    
+    $('#openWeb').on('click',function(){
+      window.open($('#originalWeb').attr('src'));
+    });
+  </script>
+</body>
+</html>
